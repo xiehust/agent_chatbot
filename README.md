@@ -109,3 +109,6 @@ streamlit run streamlit_agent_chat.py
 ## 文件说明
 
 - `streamlit_agent_chat.py`：聊天界面的主要Streamlit应用程序
+
+## 示例
+![alt text](asset/image1.png)
