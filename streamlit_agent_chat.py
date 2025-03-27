@@ -18,6 +18,12 @@ if "messages" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state.session_id = f"streamlit_session_{int(time.time())}"
 
+if "enable_trace" not in st.session_state:
+    st.session_state.enable_trace = True
+    
+if "message_history_limit" not in st.session_state:
+    st.session_state.message_history_limit = 1
+
 # Sidebar for configuration
 st.sidebar.title("Agent Configuration")
 
@@ -30,6 +36,16 @@ agent_alias_id = st.sidebar.text_input("Agent Alias ID", value="VAMG77RCAX")
 
 # Session ID input
 st.session_state.session_id = st.sidebar.text_input("Session ID", value="test001")
+
+# Enable trace toggle
+st.session_state.enable_trace = st.sidebar.toggle("Enable Trace", value=st.session_state.enable_trace)
+
+# Message history limit
+st.session_state.message_history_limit = st.sidebar.slider("Message History Limit", 
+                                                          min_value=0, 
+                                                          max_value=10, 
+                                                          value=st.session_state.message_history_limit, 
+                                                          help="Maximum number of previous messages to include in conversation history")
 
 # Reset conversation button
 if st.sidebar.button("Reset Conversation"):
@@ -81,7 +97,7 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
             'agentAliasId': agent_alias_id,
             'sessionId': session_id,
             'inputText': prompt,
-            'enableTrace': True,
+            'enableTrace': st.session_state.enable_trace,
             'streamingConfigurations': {"streamFinalResponse": True}
         }
         
@@ -101,7 +117,7 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
         first_token_time = None
         
         for event in response.get("completion"):
-            if 'trace' in event:
+            if 'trace' in event and st.session_state.enable_trace:
                 trace = event['trace']
                 if 'trace' in trace:
                     # Display trace information in JSON format
@@ -147,12 +163,15 @@ if prompt := st.chat_input("Ask the agent something..."):
     
     # Display assistant response with streaming
     with st.chat_message("assistant"):
+        # Apply message history limit before passing to the agent
+        limited_message_history = st.session_state.messages[-(st.session_state.message_history_limit):-1] if len(st.session_state.messages) > st.session_state.message_history_limit else st.session_state.messages[:-1]
+        
         response = invoke_agent(
             agent_id=agent_id,
             agent_alias_id=agent_alias_id,
             session_id=st.session_state.session_id,
             prompt=prompt,
-            message_history=st.session_state.messages[:-1]  # Pass all previous messages except the current one
+            message_history=limited_message_history if st.session_state.message_history_limit else [] # Pass limited previous messages
         )
         
     # Add assistant response to chat history
@@ -172,3 +191,5 @@ st.sidebar.markdown("""
 st.sidebar.markdown("---")
 st.sidebar.subheader("Debug Info")
 st.sidebar.markdown(f"Total Messages: {len(st.session_state.messages)}")
+st.sidebar.markdown(f"Messages in History: {min(len(st.session_state.messages)-1, st.session_state.message_history_limit) if len(st.session_state.messages) > 0 else 0} (Limit: {st.session_state.message_history_limit})")
+st.sidebar.markdown(f"Trace Enabled: {'Yes' if st.session_state.enable_trace else 'No'}")
