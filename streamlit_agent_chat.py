@@ -1,6 +1,7 @@
 import streamlit as st
 import boto3
 import time
+import json
 from botocore.exceptions import ClientError
 
 # Page configuration
@@ -80,6 +81,7 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
             'agentAliasId': agent_alias_id,
             'sessionId': session_id,
             'inputText': prompt,
+            'enableTrace': True,
             'streamingConfigurations': {"streamFinalResponse": True}
         }
         
@@ -91,13 +93,23 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
         # Invoke the agent with the prepared parameters
         response = agents_runtime_client.invoke_agent(**request_params)
 
-        # Create a placeholder for the streaming response
+        # Create placeholders for the streaming response and trace
         response_placeholder = st.empty()
+        trace_container = st.container()
         completion = ""
         start_time = time.time()
         first_token_time = None
         
         for event in response.get("completion"):
+            if 'trace' in event:
+                trace = event['trace']
+                if 'trace' in trace:
+                    # Display trace information in JSON format
+                    # with trace_container:
+                    with st.expander(label='Trace', expanded=False):
+                        st.subheader("Trace Information")
+                        st.json(trace['trace'])
+                        
             if "chunk" not in event:
                 continue
             chunk = event["chunk"]

@@ -8,8 +8,8 @@ agents_runtime_client = boto3.client('bedrock-agent-runtime',
                                     )
 
 agent_id = "LMS0QRJENV"
-# agent_alias_id = "LAET3PKA7G" #c3.5
-agent_alias_id = "VAMG77RCAX" #nova
+# agent_alias_id = "LAET3PKA7G" #version 2 c3.5
+agent_alias_id = "VAMG77RCAX" #version 1 nova
 session_id = "test002"
 prompt = "保险报销政策是怎么样的"
 
@@ -62,6 +62,7 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
             'agentAliasId': agent_alias_id,
             'sessionId': session_id,
             'inputText': prompt,
+            'enableTrace':True,
             'streamingConfigurations': {"streamFinalResponse": True}
         }
         
@@ -80,12 +81,16 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
         is_first = False
         for event in response.get("completion"):
             t2 = time.time()
-            chunk = event["chunk"]
-            if not is_first:
-                print(f'First Token Time:{t2-t1}')
-                is_first = True
-            print(completion)
-            completion = completion + chunk["bytes"].decode()
+            if 'trace' in event:
+                print(f"Trace: {event['trace']['trace']}")
+                continue
+            elif 'chunk' in event:
+                chunk = event["chunk"]
+                if not is_first:
+                    print(f'First Token Time:{t2-t1}')
+                    is_first = True
+                completion = completion + chunk["bytes"].decode()
+                print(chunk["bytes"].decode(),end="",flush=True)
 
     except ClientError as e:
         print(f"Couldn't invoke agent. {e}")
