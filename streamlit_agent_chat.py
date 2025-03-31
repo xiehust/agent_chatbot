@@ -164,14 +164,31 @@ if prompt := st.chat_input("Ask the agent something..."):
     # Display assistant response with streaming
     with st.chat_message("assistant"):
         # Apply message history limit before passing to the agent
-        limited_message_history = st.session_state.messages[-(st.session_state.message_history_limit):-1] if len(st.session_state.messages) > st.session_state.message_history_limit else st.session_state.messages[:-1]
+        # Ensure conversation history follows the proper alternating pattern of user/assistant
+        limited_message_history = []
+        if st.session_state.message_history_limit > 0:
+            # Get past messages but exclude the current user message (which was just added)
+            past_messages = st.session_state.messages[:-1]
+            
+            # Ensure we have pairs of messages (user followed by assistant)
+            # Start from the most recent and work backwards, ensuring we include complete pairs
+            pairs_to_include = min(st.session_state.message_history_limit // 2, len(past_messages) // 2)
+            
+            if pairs_to_include > 0:
+                # Get the most recent pairs, starting from the end
+                start_idx = len(past_messages) - (pairs_to_include * 2)
+                limited_message_history = past_messages[start_idx:]
+                
+                # Double-check that our history starts with user and alternates properly
+                if limited_message_history and limited_message_history[0]["role"] != "user":
+                    limited_message_history = limited_message_history[1:]  # Skip the first assistant message
         
         response = invoke_agent(
             agent_id=agent_id,
             agent_alias_id=agent_alias_id,
             session_id=st.session_state.session_id,
             prompt=prompt,
-            message_history=limited_message_history if st.session_state.message_history_limit else [] # Pass limited previous messages
+            message_history=limited_message_history
         )
         
     # Add assistant response to chat history
