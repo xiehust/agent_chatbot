@@ -2,6 +2,7 @@ import streamlit as st
 import boto3
 import time
 import json
+import uuid
 from botocore.exceptions import ClientError
 
 # Page configuration
@@ -16,7 +17,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "session_id" not in st.session_state:
-    st.session_state.session_id = f"streamlit_session_{int(time.time())}"
+    st.session_state.session_id = str(uuid.uuid4())
 
 if "enable_trace" not in st.session_state:
     st.session_state.enable_trace = True
@@ -31,11 +32,11 @@ st.sidebar.title("Agent Configuration")
 region = st.sidebar.text_input("AWS Region", value="us-east-1")
 
 # Agent ID and Alias ID inputs
-agent_id = st.sidebar.text_input("Agent ID", value="LMS0QRJENV")
-agent_alias_id = st.sidebar.text_input("Agent Alias ID", value="VAMG77RCAX")
+agent_id = st.sidebar.text_input("Agent ID", value="")
+agent_alias_id = st.sidebar.text_input("Agent Alias ID", value="")
 
-# Session ID input
-st.session_state.session_id = st.sidebar.text_input("Session ID", value="test001")
+# Session ID display (read-only)
+st.sidebar.text_input("Session ID", value=st.session_state.session_id, disabled=True)
 
 # Enable trace toggle
 st.session_state.enable_trace = st.sidebar.toggle("Enable Trace", value=st.session_state.enable_trace)
@@ -50,6 +51,7 @@ st.session_state.message_history_limit = st.sidebar.slider("Message History Limi
 # Reset conversation button
 if st.sidebar.button("Reset Conversation"):
     st.session_state.messages = []
+    st.session_state.session_id = str(uuid.uuid4())  # Generate a new random session ID
     st.rerun()
 
 # Initialize Bedrock Agent Runtime client
@@ -117,11 +119,14 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
         first_token_time = None
         
         for event in response.get("completion"):
+            if 'returnControl' in event and st.session_state.enable_trace:
+                return_control = event['returnControl']
+                with st.expander(label='ReturnControl', expanded=False):
+                    st.subheader("returnControl Information")
+                    st.json(return_control)
             if 'trace' in event and st.session_state.enable_trace:
                 trace = event['trace']
                 if 'trace' in trace:
-                    # Display trace information in JSON format
-                    # with trace_container:
                     with st.expander(label='Trace', expanded=False):
                         st.subheader("Trace Information")
                         st.json(trace['trace'])
@@ -133,13 +138,13 @@ def invoke_agent(agent_id, agent_alias_id, session_id, prompt, message_history=N
             if first_token_time is None:
                 first_token_time = current_time
                 latency = first_token_time - start_time
-                st.sidebar.metric("First Token Latency", f"{latency:.2f}s")
+                # st.sidebar.metric("First Token Latency", f"{latency:.2f}s")
             
             completion += chunk["bytes"].decode()
             response_placeholder.markdown(completion)
         
         total_time = time.time() - start_time
-        st.sidebar.metric("Total Response Time", f"{total_time:.2f}s")
+        # st.sidebar.metric("Total Response Time", f"{total_time:.2f}s")
         
         return completion
 
